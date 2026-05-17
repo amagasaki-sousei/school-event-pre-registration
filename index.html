@@ -1,72 +1,236 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-
-<meta charset="utf-8">
-
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1"
->
-
-<meta
-  http-equiv="Cache-Control"
-  content="no-cache, no-store, must-revalidate"
->
-
-<meta http-equiv="Pragma" content="no-cache">
-
-<meta http-equiv="Expires" content="0">
-
-<title>体育祭予約</title>
-
-<style>
-
-html,
-body {
-
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-
-}
-
-iframe {
-
-  width:100%;
-  height:100vh;
-  border:none;
-
-}
-
-</style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>体育祭 事前来場予約フォーム</title>
+  
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background-color: #f4f7f6; }
+    .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    label { font-size: 14px; font-weight: bold; display: block; margin-bottom: 8px; color: #333; }
+    select, input { margin-bottom: 15px; width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+    #nameDisplay { font-weight: bold; color: #1a73e8; margin-bottom: 20px; padding: 12px; background: #e8f0fe; border-radius: 6px; text-align: center; border: 1px dashed #1a73e8; }
+    button { background: #1a73e8; color: white; padding: 15px; border: none; width: 100%; font-size: 18px; cursor: pointer; border-radius: 6px; font-weight: bold; }
+    .info-box { background: #fffbe6; border: 1px solid #ffe58f; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; color: #555; }
+    #successMessage { display: none; text-align: center; }
+    #statusMessage { display: none; background: #fff4e5; border: 1px solid #ffcc80; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #8a4b00; line-height: 1.7; }
+    .contact-box { font-size: 13px; color: #555; text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; line-height: 1.6; }
+  </style>
 </head>
+<body style="overscroll-behavior-y: contain;">
 
-<body>
+  <div id="formContainer" class="container">
+    <div style="text-align: center; margin-bottom: 10px;">
+      <img src="https://drive.google.com/thumbnail?id=1qBshqyH8dR94TfkDlqzwvKsBTNzN9Fpj&sz=w300" style="width: 80px; max-width: 85%; height: auto; display: block; margin: 0 auto;" loading="lazy" decoding="async">
+    </div>
+    <h2 style="text-align:center; margin-top:0; margin-bottom:10px;">市立尼崎双星高等学校 <br> 令和８年度 体育祭 事前来場予約フォーム</h2>
+    
+    <div class="info-box">
+      <ul style="margin: 0; padding-left: 15px; list-style-type: '● ';">
+        <li>事前予約受付日時：<span id="reservationWindow">読み込み中...</span></li>
+        <li>１家族につき1つのQRコードのみ（時間差で来校する際は当日受付時にお申し出ください）</li>
+        <li>当日はスマートフォン等でQRコードをご提示ください</li>
+        <li><font color="red">関係者以外に、発行されるQRコードのスクリーンショットの配布、メールの転送を禁止します。</font></li>
+        <li><font color="red">その他、不正な方法で入手したものについても同様に入場をお断りする場合がございます。</font></li>
+      </ul>
+    </div>
+    
+    <div id="statusMessage"></div>
 
-<iframe
-  id="app"
-  sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
-></iframe>
+    <form id="reserveForm">
+      <label>■ 学年</label>
+      <select id="grade" name="grade" onchange="updateClass()" required>
+        <option value="">選択してください</option>
+        <option value="1">1年</option>
+        <option value="2">2年</option>
+        <option value="3">3年</option>
+      </select>
 
-<script>
+      <label>■ 組</label>
+      <select id="klass" name="klass" onchange="updateNumber()" required>
+        <option value="">学年を先に選択</option>
+      </select>
 
-const GAS_URL =
-"https://script.google.com/macros/s/AKfycbzCWMMUSp6JgiO0WWuJ95XpCIp2EWOE9N8tQcBXTlinNbrYDqW2bKUikuPWzRP6Us3ADA/exec";
+      <label>■ 出席番号</label>
+      <select id="num" name="num" onchange="checkName()" required>
+        <option value="">組を先に選択</option>
+      </select>
 
-function loadApp() {
+      <label>■ お子様の氏名確認</label>
+      <div id="nameDisplay">学年・組・番号を指定してください</div>
+      <input type="hidden" id="hiddenName" name="name">
 
-  document.getElementById("app").src =
-    GAS_URL + "?t=" + Date.now();
+      <label>■ 来場人数（保護者）</label>
+      <select id="count" name="count" required>
+        <option value="1">1名</option>
+        <option value="2">2名</option>
+        <option value="3">3名</option>
+        <option value="4">4名</option>
+        <option value="5">5名</option>
+      </select>
 
-}
+      <label>■ メールアドレス</label>
+      <input type="email" name="email" id="emailField" placeholder="example@gmail.com" required>
 
-loadApp();
+      <button type="button" id="submitBtn" onclick="submitForm(this)">登録してQRコードを受け取る</button>
+      
+      <p style="font-size: 12px; color: #666; margin-top: 15px; line-height: 1.5;">
+        ※登録完了後、入力したアドレス宛に受付用QRコードが届きます。<br>
+        「@gmail.com」からのメールを受信できるように設定してください。
+      </p>
+    </form>
+  </div>
 
-</script>
+  <div id="successMessage" class="container">
+    <h2 style="color: #34a853;">登録が完了しました</h2>
+    <p style="line-height: 1.8;">ご入力いただいたメールアドレス宛に、<br><strong>受付用QRコード</strong>を送信しました。</p>
+    <p style="font-size: 14px; color: #666;">メールが届かない場合は、迷惑メールフォルダをご確認いただくか、再度正しいアドレスで登録してください。</p>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+    
+    <div class="contact-box">
+      <p style="margin: 0 0 5px 0;"><strong>お問合せ先：</strong>onishi-su@cen.ama-net.ed.jp</p>
+      <p style="margin: 0;"><strong>事前予約担当者：</strong>大西</p>
+    </div>
+    <button onclick="reloadPage()" style="background-color: #666; margin-top: 20px;">戻る</button>
+  </div>
 
+  <script>
+    // ★重要: ここをご自身の「ウェブアプリとしてデプロイした最新のGASのURL」に差し替えてください
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzCWMMUSp6JgiO0WWuJ95XpCIp2EWOE9N8tQcBXTlinNbrYDqW2bKUikuPWzRP6Us3ADA/exec";
+
+    // Android Chrome 再読み込みエラー対策
+    if (window.history.replaceState) {
+      window.history.replaceState(null, null, window.location.pathname);
+    }
+
+    // ページ読み込み時に受付期間をチェック
+    window.addEventListener('DOMContentLoaded', function() {
+      fetch(`${GAS_API_URL}?action=getPageAvailability`)
+        .then(res => res.json())
+        .then(status => {
+          document.getElementById('reservationWindow').innerText = status.startText + ' ～ ' + status.endText;
+          if (!status.isAvailable) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.style.display = 'block';
+            statusMessage.innerHTML = '<strong>' + status.message + '</strong><br>公開期間：' + status.startText + ' ～ ' + status.endText + '<br>現在時刻：' + status.nowText;
+            document.getElementById('reserveForm').style.display = 'none';
+          }
+        }).catch(err => console.error("初期化エラー:", err));
+    });
+
+    function reloadPage() {
+      window.location.href = window.location.origin + window.location.pathname;
+    }
+
+    function updateClass() {
+      const grade = document.getElementById('grade').value;
+      const klassSelect = document.getElementById('klass');
+      klassSelect.innerHTML = '<option value="">選択してください</option>';
+      if (grade) {
+        const maxKlass = (grade === "1") ? 9 : 10;
+        for (let i = 1; i <= maxKlass; i++) {
+          let opt = document.createElement('option');
+          opt.value = i; opt.textContent = i + '組';
+          klassSelect.appendChild(opt);
+        }
+      }
+      document.getElementById('num').innerHTML = '<option value="">組を先に選択</option>';
+      document.getElementById('nameDisplay').innerText = "学年・組・番号を指定してください";
+      document.getElementById('hiddenName').value = "";
+    }
+
+    // クラス名簿を一括取得（高速化）
+    let currentClassList = {};
+    function updateNumber() {
+      const grade = document.getElementById('grade').value;
+      const klass = document.getElementById('klass').value;
+      const numSelect = document.getElementById('num');
+      
+      if (grade && klass) {
+        numSelect.innerHTML = '<option value="">読み込み中...</option>';
+        
+        fetch(`${GAS_API_URL}?action=getClassList&grade=${grade}&klass=${klass}`)
+          .then(res => res.json())
+          .then(data => {
+            currentClassList = data.classList;
+            numSelect.innerHTML = '<option value="">選択してください</option>';
+            if (data.maxNum > 0) {
+              for (let i = 1; i <= data.maxNum; i++) {
+                let opt = document.createElement('option');
+                opt.value = i; opt.textContent = i + '番';
+                numSelect.appendChild(opt);
+              }
+            } else {
+              numSelect.innerHTML = '<option value="">データなし</option>';
+            }
+          }).catch(() => { numSelect.innerHTML = '<option value="">通信エラー</option>'; });
+      } else {
+        numSelect.innerHTML = '<option value="">組を先に選択</option>';
+      }
+    }
+
+    function checkName() {
+      const num = document.getElementById('num').value;
+      const display = document.getElementById('nameDisplay');
+      const hidden = document.getElementById('hiddenName');
+
+      if (num && currentClassList[num]) {
+        const name = currentClassList[num];
+        display.style.color = "#1a73e8";
+        display.innerText = name + " さん";
+        hidden.value = name;
+      } else if (num) {
+        display.style.color = "#d93025";
+        display.innerText = "該当生徒なし";
+        hidden.value = "";
+      }
+    }
+
+    function submitForm(btn) {
+      const name = document.getElementById('hiddenName').value;
+      const email = document.getElementById('emailField').value;
+      if (!name || !email) { alert("生徒名を特定し、メールアドレスを入力してください。"); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = "送信中...";
+
+      const form = document.getElementById('reserveForm');
+      const formData = new FormData(form);
+      
+      // 送信用パラメータの作成
+      const params = new URLSearchParams();
+      for (const pair of formData.entries()) {
+        params.append(pair[0], pair[1]);
+      }
+
+      fetch(GAS_API_URL, {
+        method: "POST",
+        body: params,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+      })
+      .then(res => res.text())
+      .then(result => {
+        if (result.indexOf("【エラー】") !== -1) {
+          alert(result);
+          btn.disabled = false;
+          btn.innerHTML = "登録してQRコードを受け取る";
+        } else {
+          document.getElementById('formContainer').style.display = 'none';
+          document.getElementById('successMessage').style.display = 'block';
+          window.scrollTo(0, 0);
+        }
+      })
+      .catch(err => {
+        alert("システムエラーが発生しました。");
+        btn.disabled = false;
+        btn.innerHTML = "登録してQRコードを受け取る";
+      });
+    }
+  </script>
 </body>
 </html>
