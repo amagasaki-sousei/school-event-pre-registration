@@ -235,7 +235,7 @@
     function submitForm(btn) {
       const name = document.getElementById('hiddenName').value;
       const email = document.getElementById('emailField').value;
-      if (!name || !email) { alert("生徒名を特定し、メールアドレスを入力してください。"); return; }
+      if (!name || !email) { alert("生徒名が表示されていることを確認し、メールアドレスを入力してください。"); return; }
 
       btn.disabled = true;
       btn.innerHTML = "送信中...";
