@@ -32,7 +32,7 @@
     
     <div class="info-box">
       <ul style="margin: 0; padding-left: 15px; list-style-type: '● ';">
-        <li>事前予約受付日時：<br><span id="reservationWindow">読み込み中...</span></li>
+        <li>事前予約受付日時：<br><span id="reservationWindow">2026/05/17 09:00 ～ 2026/06/01 17:00</span></li>
         <li>１家族につき1つのQRコードのみ（時間差で来校する際は当日受付時にお申し出ください）</li>
         <li>当日はスマートフォン等でQRコードをご提示ください</li>
         <li><font color="red">関係者以外に、発行されるQRコードのスクリーンショットの配布、メールの転送を禁止します。</font></li>
@@ -107,6 +107,10 @@
     // ★重要: ここをご自身の「ウェブアプリとしてデプロイした最新のGASのURL」に差し替えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzj855Cj6qRvHTSA6bYtZ-vPzdrdPAqLf3j5VLnMpBs8gCfmpP3lZ6R8V9ebKCYMPSBbA/exec";
 
+    // 🌟 受付期間をHTML側にも設定（JSTタイムゾーンを考慮）
+    const START_DATE = new Date('2026-05-17T09:00:00+09:00');
+    const END_DATE = new Date('2026-06-01T17:00:00+09:00');
+
     // 全校生徒の名簿データを保持する変数
     let allStudentData = {};
 
@@ -115,22 +119,28 @@
       window.history.replaceState(null, null, window.location.pathname);
     }
 
-    // ページ読み込み時に受付期間のチェックと名簿データの一括取得を行う
+    // ページ読み込み時の処理
     window.addEventListener('DOMContentLoaded', function() {
-      // 1. 受付期間チェック
-      fetch(`${GAS_API_URL}?action=getPageAvailability`)
-        .then(res => res.json())
-        .then(status => {
-          document.getElementById('reservationWindow').innerText = status.startText + ' ～ ' + status.endText;
-          if (!status.isAvailable) {
-            const statusMessage = document.getElementById('statusMessage');
-            statusMessage.style.display = 'block';
-            statusMessage.innerHTML = '<strong>' + status.message + '</strong><br>公開期間：' + status.startText + ' ～ ' + status.endText + '<br>現在時刻：' + status.nowText;
-            document.getElementById('reserveForm').style.display = 'none';
-          }
-        }).catch(err => console.error("初期化エラー:", err));
+      // 1. 🌟 通信なしで瞬時に期間チェック
+      const now = new Date();
+      if (now < START_DATE || now > END_DATE) {
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.style.display = 'block';
+        
+        const pad = (n) => String(n).padStart(2, '0');
+        const format = (d) => `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        const formatFull = (d) => `${format(d)}:${pad(d.getSeconds())}`;
 
-      // 2. 名簿データの一括事前取得（バックグラウンドで高速化のために実行）
+        if (now < START_DATE) {
+          statusMessage.innerHTML = '<strong>現在は受付開始前です。</strong><br>公開期間：' + format(START_DATE) + ' ～ ' + format(END_DATE) + '<br>現在時刻：' + formatFull(now);
+        } else {
+          statusMessage.innerHTML = '<strong>現在は受付終了後です。</strong><br>受付期間は ' + format(START_DATE) + ' ～ ' + format(END_DATE) + ' でした。<br>現在時刻：' + formatFull(now);
+        }
+        document.getElementById('reserveForm').style.display = 'none';
+        return; // 期間外なら名簿読み込みもスキップして終了
+      }
+
+      // 2. 名簿データの一括事前取得（バックグラウンドで実行）
       fetch(`${GAS_API_URL}?action=getAllClassData`)
         .then(res => res.json())
         .then(data => {
@@ -169,7 +179,6 @@
         const classKey = `${grade}-${klass}`;
         numSelect.innerHTML = '<option value="">選択してください</option>';
         
-        // 事前取得したデータがあるか確認
         if (allStudentData && allStudentData[classKey]) {
           const classInfo = allStudentData[classKey];
           if (classInfo.maxNum > 0) {
@@ -182,12 +191,10 @@
             numSelect.innerHTML = '<option value="">データなし</option>';
           }
         } else {
-          // 万が一、最初のロードが間に合っていなかった場合は従来の個別通信にフォールバック
           numSelect.innerHTML = '<option value="">読み込み中...</option>';
           fetch(`${GAS_API_URL}?action=getClassList&grade=${grade}&klass=${klass}`)
             .then(res => res.json())
             .then(data => {
-              // バックグラウンド名簿を補完
               if (!allStudentData) allStudentData = {};
               allStudentData[classKey] = data;
               
@@ -240,9 +247,9 @@
       const form = document.getElementById('reserveForm');
       const formData = new FormData(form);
       
-      // 送信用パラメータの作成
       const params = new URLSearchParams();
       for (const pair of formData.entries()) {
+        params.append(pair[0], pair[ pair[0] == 'email' ? 'email' : pair[0] ]); // 簡易引き継ぎ
         params.append(pair[0], pair[1]);
       }
 
