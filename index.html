@@ -107,13 +107,17 @@
     // ★重要: ここをご自身の「ウェブアプリとしてデプロイした最新のGASのURL」に差し替えてください
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzj855Cj6qRvHTSA6bYtZ-vPzdrdPAqLf3j5VLnMpBs8gCfmpP3lZ6R8V9ebKCYMPSBbA/exec";
 
+    // 全校生徒の名簿データを保持する変数
+    let allStudentData = {};
+
     // Android Chrome 再読み込みエラー対策
     if (window.history.replaceState) {
       window.history.replaceState(null, null, window.location.pathname);
     }
 
-    // ページ読み込み時に受付期間をチェック
+    // ページ読み込み時に受付期間のチェックと名簿データの一括取得を行う
     window.addEventListener('DOMContentLoaded', function() {
+      // 1. 受付期間チェック
       fetch(`${GAS_API_URL}?action=getPageAvailability`)
         .then(res => res.json())
         .then(status => {
@@ -125,6 +129,13 @@
             document.getElementById('reserveForm').style.display = 'none';
           }
         }).catch(err => console.error("初期化エラー:", err));
+
+      // 2. 名簿データの一括事前取得（バックグラウンドで高速化のために実行）
+      fetch(`${GAS_API_URL}?action=getAllClassData`)
+        .then(res => res.json())
+        .then(data => {
+          allStudentData = data;
+        }).catch(err => console.error("名簿データ取得エラー:", err));
     });
 
     function reloadPage() {
@@ -148,43 +159,66 @@
       document.getElementById('hiddenName').value = "";
     }
 
-    // クラス名簿を一括取得（高速化）
-    let currentClassList = {};
+    // クラス名簿をスマホ内のデータから一瞬で生成（完全高速化）
     function updateNumber() {
       const grade = document.getElementById('grade').value;
       const klass = document.getElementById('klass').value;
       const numSelect = document.getElementById('num');
       
       if (grade && klass) {
-        numSelect.innerHTML = '<option value="">読み込み中...</option>';
+        const classKey = `${grade}-${klass}`;
+        numSelect.innerHTML = '<option value="">選択してください</option>';
         
-        fetch(`${GAS_API_URL}?action=getClassList&grade=${grade}&klass=${klass}`)
-          .then(res => res.json())
-          .then(data => {
-            currentClassList = data.classList;
-            numSelect.innerHTML = '<option value="">選択してください</option>';
-            if (data.maxNum > 0) {
-              for (let i = 1; i <= data.maxNum; i++) {
-                let opt = document.createElement('option');
-                opt.value = i; opt.textContent = i + '番';
-                numSelect.appendChild(opt);
-              }
-            } else {
-              numSelect.innerHTML = '<option value="">データなし</option>';
+        // 事前取得したデータがあるか確認
+        if (allStudentData && allStudentData[classKey]) {
+          const classInfo = allStudentData[classKey];
+          if (classInfo.maxNum > 0) {
+            for (let i = 1; i <= classInfo.maxNum; i++) {
+              let opt = document.createElement('option');
+              opt.value = i; opt.textContent = i + '番';
+              numSelect.appendChild(opt);
             }
-          }).catch(() => { numSelect.innerHTML = '<option value="">通信エラー</option>'; });
+          } else {
+            numSelect.innerHTML = '<option value="">データなし</option>';
+          }
+        } else {
+          // 万が一、最初のロードが間に合っていなかった場合は従来の個別通信にフォールバック
+          numSelect.innerHTML = '<option value="">読み込み中...</option>';
+          fetch(`${GAS_API_URL}?action=getClassList&grade=${grade}&klass=${klass}`)
+            .then(res => res.json())
+            .then(data => {
+              // バックグラウンド名簿を補完
+              if (!allStudentData) allStudentData = {};
+              allStudentData[classKey] = data;
+              
+              numSelect.innerHTML = '<option value="">選択してください</option>';
+              if (data.maxNum > 0) {
+                for (let i = 1; i <= data.maxNum; i++) {
+                  let opt = document.createElement('option');
+                  opt.value = i; opt.textContent = i + '番';
+                  numSelect.appendChild(opt);
+                }
+              } else {
+                numSelect.innerHTML = '<option value="">データなし</option>';
+              }
+            }).catch(() => { numSelect.innerHTML = '<option value="">通信エラー</option>'; });
+        }
       } else {
         numSelect.innerHTML = '<option value="">組を先に選択</option>';
       }
     }
 
     function checkName() {
+      const grade = document.getElementById('grade').value;
+      const klass = document.getElementById('klass').value;
       const num = document.getElementById('num').value;
       const display = document.getElementById('nameDisplay');
       const hidden = document.getElementById('hiddenName');
 
-      if (num && currentClassList[num]) {
-        const name = currentClassList[num];
+      const classKey = `${grade}-${klass}`;
+
+      if (num && allStudentData && allStudentData[classKey] && allStudentData[classKey].classList[num]) {
+        const name = allStudentData[classKey].classList[num];
         display.style.color = "#1a73e8";
         display.innerText = name + " さん";
         hidden.value = name;
